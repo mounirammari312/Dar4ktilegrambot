@@ -118,6 +118,26 @@ mistral_client = Mistral(api_key=MISTRAL_API_KEY)
 message_timestamps = []
 tg_client = None
 
+async def handle_render_ping(reader, writer):
+    try:
+        await reader.read(1024)
+        response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK"
+        writer.write(response.encode())
+        await writer.drain()
+    except Exception:
+        pass
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+async def start_dummy_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = await asyncio.start_server(handle_render_ping, "0.0.0.0", port)
+    print(f"📡 [Web Service Firewall] Dummy HTTP server listening on port {port}")
+
 async def init_tg_client_from_mongodb():
     global tg_client
     if not MONGODB_URI:
@@ -224,11 +244,14 @@ async def setup_event_handlers():
 
 async def main():
     print("=====================================================")
-    print("🛰️ بدء تشغيل محرك Darpro4k السحابي المستقل...")
-    await init_tg_client_from_mongodb()
+    print("🛰️ بدء تشغيل محرك Darpro4k السحابي المستقل (Web Service Mode)...")
+    await asyncio.gather(
+        start_dummy_web_server(),
+        init_tg_client_from_mongodb()
+    )
     await setup_event_handlers()
     await tg_client.start()
-    print("⚡ [تأكيد أمني] الاتصال السحابي قائم حياً عبر الذاكرة العشوائية.")
+    print("⚡ [تأكيد أمني] الاتصال السحابي قائم حياً وبوابة الويب نشطة.")
     print("=====================================================\n")
     await tg_client.run_until_disconnected()
 
